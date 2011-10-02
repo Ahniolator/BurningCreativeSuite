@@ -1,0 +1,46 @@
+author: Ahniolator
+database: false
+description: A suite of features that make creative mode a little safer, easier, and
+  more fun!
+generator: http://dinnerbone.com/minecraft/tools/pluginator/
+main: me.ahniolator.plugins.burningcreativesuite.BurningCreativeSuite
+name: Burning Creative Suite
+startup: postworld
+version: '1.39'
+permissions:
+  bcs.*:
+    description: Gives all permissions nodes
+    children:
+      bcs.admin: true
+      bcs.bypass.*: true
+    default: false
+  bcs.admin:
+    description: Give access to all Burning Creative Suite admin commands
+    default: op
+  bcs.bypass.*:
+    description: Gives all .bypass permissions nodes
+    children:
+      bcs.bypass.blockbreak: true
+      bcs.bypass.creativedrop: true
+      bcs.bypass.inventory: true
+      bcs.bypass.bedrock: true
+    default: false
+  bcs.bypass.blockbreak:
+    description: Allows breaking creative blocks as if the were normal
+    default: false
+  bcs.bypass.creativedrop:
+    description: Allows dropping of items in Creative mode
+    default: false
+  bcs.bypass.inventory:
+    description: Allows sharing inventory between worlds/game modes
+    default: false
+  bcs.bypass.bedrock:
+    description: Allows breaking of bedrock at the bottom of the world
+    default: false
+  bcs.commands.toggle:
+    description: Allows use of the /bcs toggle command
+    default: false
+commands:
+  bcs:
+    description: Shows the help dialog
+    usage: /<command> <help>
