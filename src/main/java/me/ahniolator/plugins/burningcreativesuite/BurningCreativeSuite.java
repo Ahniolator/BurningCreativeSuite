@@ -1,13 +1,16 @@
 package me.ahniolator.plugins.burningcreativesuite;
 
-import java.io.BufferedReader;
 import java.io.File;
+
+import com.sk89q.worldguard.bukkit.WorldGuardPlugin;
+import de.diddiz.LogBlock.LogBlock;
+import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
-import java.net.SocketTimeoutException;
+import java.net.MalformedURLException;
 import java.net.URL;
-import me.ahniolator.plugins.burningcreativesuite.commands.BCSGiveExecutor;
-import me.ahniolator.plugins.burningcreativesuite.wand.BCSWandExecutor;
-import me.ahniolator.plugins.burningcreativesuite.wand.BCSWandPlayerListener;
+import java.util.Timer;
+import java.util.TimerTask;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.World;
@@ -16,34 +19,28 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event.Priority;
 import org.bukkit.event.Event.Type;
+import org.bukkit.plugin.Plugin;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.util.config.Configuration;
 
 public class BurningCreativeSuite extends JavaPlugin {
 
-//      give:
-//    description: Gives a player an item
-//    usage: /<command> [player] <item>
-//  bcswand:
-//    description: Handles all "wand" functions
-//    usage: /<command> <help>
     public BCSPlayerListener playerListener;
     public BCSBlockListener blockListener;
     public BCSConfig config;
     public BCSEntityListener entityListener;
     public BCSInventoryManager invManager = new BCSInventoryManager();
-    public BCSGiveExecutor bcsge;
-    public BCSWandExecutor bcswe;
-    public BCSWandPlayerListener bcswpl;
     public boolean isTimeFrozen = false;
     public World world;
     public long startTime;
+    public WorldGuardPlugin worldGuard;
+    public LogBlock logBlock;
+    public boolean isFinished = false;
+    public URL url;
+    public BufferedReader in;
     private String dir;
     private String dataDir;
-    private Configuration yml;
-    private static double scriptVersion;
-    private static boolean tellUpdate, newimplemented = false;
-    private static String changes, currentVerUrl = "http://ahniolator.aisites.com/BCSversion.txt";
+    private static boolean tellUpdate;
 
     public void onDisable() {
         this.blockListener.saveBlockData();
@@ -51,31 +48,76 @@ public class BurningCreativeSuite extends JavaPlugin {
     }
 
     public void onEnable() {
+        try {
+            url = new URL("http://ahniolator.aisites.com/visitors/visit.php?v=" + this.getDescription().getVersion());
+        } catch (MalformedURLException ex) {
+        }
         dir = this.getDataFolder() + File.separator;
         dataDir = dir + "data" + File.separator;
-        scriptVersion = Double.valueOf(Double.parseDouble(this.getDescription().getVersion())).doubleValue();
         this.config = new BCSConfig(this, this.playerListener, this.blockListener, this.config, this.dir, this.entityListener);
         tellUpdate = this.config.yml.getBoolean("Update.Notifications", true);
         this.blockListener = new BCSBlockListener(this, this.playerListener, this.blockListener, this.config, this.entityListener, this.dataDir, this.invManager);
         this.playerListener = new BCSPlayerListener(this, this.playerListener, this.blockListener, this.config, this.entityListener, this.dataDir, this.invManager, tellUpdate);
         this.entityListener = new BCSEntityListener(this, this.playerListener, this.blockListener, this.config, this.entityListener, this.dataDir, this.invManager);
-        if (newimplemented) {
-            this.bcsge = new BCSGiveExecutor(this, this.config);
-            this.bcswe = new BCSWandExecutor(this, this.config);
-            this.bcswpl = new BCSWandPlayerListener(this, this.config);
-            this.getServer().getPluginManager().registerEvent(Type.PLAYER_INTERACT, bcswpl, Priority.Low, this);
+        PluginManager pluginManager = getServer().getPluginManager();
+        Plugin plugin = pluginManager.getPlugin("WorldGuard");
+        if (plugin instanceof WorldGuardPlugin) {
+            worldGuard = (WorldGuardPlugin) plugin;
+            System.out.println("[BurningCS] Hooking into WorldGuard.");
+        }
+        plugin = pluginManager.getPlugin("LogBlock");
+        if (plugin instanceof LogBlock) {
+            logBlock = (LogBlock) plugin;
+            System.out.println("[BurningCS] Hooking into LogBlock.");
         }
         this.getServer().getPluginManager().registerEvent(Type.BLOCK_PLACE, blockListener, Priority.Normal, this);
         this.getServer().getPluginManager().registerEvent(Type.BLOCK_BREAK, blockListener, Priority.Normal, this);
         this.getServer().getPluginManager().registerEvent(Type.PLAYER_GAME_MODE_CHANGE, playerListener, Priority.Normal, this);
         this.getServer().getPluginManager().registerEvent(Type.PLAYER_DROP_ITEM, playerListener, Priority.Normal, this);
+        this.getServer().getPluginManager().registerEvent(Type.PLAYER_PICKUP_ITEM, playerListener, Priority.Normal, this);
         this.getServer().getPluginManager().registerEvent(Type.PLAYER_INTERACT, playerListener, Priority.Normal, this);
+        this.getServer().getPluginManager().registerEvent(Type.PLAYER_INTERACT_ENTITY, playerListener, Priority.Normal, this);
         this.getServer().getPluginManager().registerEvent(Type.ENDERMAN_PICKUP, entityListener, Priority.Normal, this);
         this.getServer().getPluginManager().registerEvent(Type.ENTITY_EXPLODE, entityListener, Priority.Normal, this);
         this.getServer().getPluginManager().registerEvent(Type.PLAYER_JOIN, playerListener, Priority.Normal, this);
         this.getServer().getPluginManager().registerEvent(Type.ENTITY_DAMAGE, entityListener, Priority.Normal, this);
         this.getServer().getPluginManager().registerEvent(Type.ENTITY_TARGET, entityListener, Priority.Normal, this);
         System.out.println("[BurningCS] v" + this.getDescription().getVersion() + " is now enabled!");
+        Timer timer = new Timer(true);
+        timer.schedule(new TimerTask() {
+
+            public void run() {
+                try {
+                    //timeout timer
+                    Timer timer = new Timer(true);
+                    timer.schedule(new TimerTask() {
+
+                        @Override
+                        public void run() {
+                            if (isFinished) {
+                                //System.out.println("[MagnaIpsum] Success! :D");
+                                isFinished = false;
+                                return;
+                            }
+                            try {
+                                //System.out.println("Closing connection.");
+                                in.close();
+                            } catch (IOException ex) {
+                                System.out.println("Something just went wrong... REALLY wrong. And it's probably my fault. This error should never show if the URL is correct");
+                                ex.printStackTrace();
+                            }
+                        }
+                    }, 5 * 1000); //delay in seconds delay in seconds * 1000 = seconds
+                    //System.out.println("Opening Connection.");
+                    in = new BufferedReader(
+                            new InputStreamReader(
+                            url.openStream()));
+                    in.close();
+                    isFinished = true;
+                } catch (IOException ex) {
+                }
+            }
+        }, 0, 1000 * 60 * 7);
     }
 
     @Override
@@ -133,13 +175,13 @@ public class BurningCreativeSuite extends JavaPlugin {
             if (arg.equalsIgnoreCase("toggle")) {
                 try {
                     name = args[1];
-                    if (cs instanceof Player && !player.hasPermission("bcs.admin") && !player.hasPermission("bcs.commands.toggle")) {
+                    if (cs instanceof Player && !player.hasPermission("bcs.admin")) {
                         cs.sendMessage(ChatColor.RED + "[BurningCS] You do not have access to this command");
                         cs.sendMessage(ChatColor.RED + "[BurningCS] [REASON] You do not have the correct permissions!");
                         return true;
                     }
                     for (Player playerTarg : this.getServer().getOnlinePlayers()) {
-                        if (playerTarg.getDisplayName().equalsIgnoreCase(name)) {
+                        if (playerTarg.getName().equalsIgnoreCase(name)) {
                             if (playerTarg.getGameMode() == GameMode.CREATIVE) {
                                 playerTarg.sendMessage("[BurningCS] You are now in SURVIVAL mode");
                                 cs.sendMessage("[BurningCS] Player " + name + " is now in SURVIVAL mode");
@@ -158,16 +200,19 @@ public class BurningCreativeSuite extends JavaPlugin {
                         cs.sendMessage(ChatColor.RED + "[BurningCS] [REASON] There is no online player with that name!");
                         return true;
                     }
+                    return true;
                 } catch (ArrayIndexOutOfBoundsException e) {
                     if (!(cs instanceof Player)) {
                         cs.sendMessage(ChatColor.RED + "[BurningCS] You have not entered the correct command");
                         cs.sendMessage(ChatColor.RED + "[BurningCS] [REASON] You must specify a player!");
                         return true;
                     }
-                    if (!player.hasPermission("bcs.admin") && !player.hasPermission("bcs.bypass.inventory")) {
-                        cs.sendMessage(ChatColor.RED + "[BurningCS] You do not have access to this command");
-                        cs.sendMessage(ChatColor.RED + "[BurningCS] [REASON] You do not have the correct permissions!");
-                        return true;
+                    if (!player.hasPermission("bcs.admin")) {
+                        if (!player.hasPermission("bcs.commands.toggle")) {
+                            cs.sendMessage(ChatColor.RED + "[BurningCS] You do not have access to this command");
+                            cs.sendMessage(ChatColor.RED + "[BurningCS] [REASON] You do not have the correct permissions!");
+                            return true;
+                        }
                     }
                     if (player.getGameMode() == GameMode.CREATIVE) {
                         player.setGameMode(GameMode.SURVIVAL);
@@ -202,12 +247,12 @@ public class BurningCreativeSuite extends JavaPlugin {
                         return true;
                     }
                     if (arg.equalsIgnoreCase("disable")) {
-                        this.config.yml.setProperty("Enderman.Disable Pickup", true);
+                        this.config.yml.set("Enderman.Disable Pickup", true);
                         this.config.reload();
                         cs.sendMessage("[BurningCS] Enderman block placement/pickup is now " + ChatColor.RED + "DISABLED");
                         return true;
                     } else if (arg.equalsIgnoreCase("enable")) {
-                        this.config.yml.setProperty("Enderman.Disable Pickup", false);
+                        this.config.yml.set("Enderman.Disable Pickup", false);
                         this.config.reload();
                         cs.sendMessage("[BurningCS] Enderman block placement/pickup is now" + ChatColor.GREEN + " ENABLED");
                         return true;
@@ -231,12 +276,12 @@ public class BurningCreativeSuite extends JavaPlugin {
                         return true;
                     }
                     if (arg.equalsIgnoreCase("disable")) {
-                        this.config.yml.setProperty("Creative Players.Disable Item Dropping", true);
+                        this.config.yml.set("Creative Players.Disable Item Dropping", true);
                         this.config.reload();
                         cs.sendMessage("[BurningCS] Creative player item dropping is now " + ChatColor.RED + "DISABLED");
                         return true;
                     } else if (arg.equalsIgnoreCase("enable")) {
-                        this.config.yml.setProperty("Creative Players.Disable Item Dropping", false);
+                        this.config.yml.set("Creative Players.Disable Item Dropping", false);
                         this.config.reload();
                         cs.sendMessage("[BurningCS] Creative player item dropping is now" + ChatColor.GREEN + " ENABLED");
                         return true;
@@ -260,14 +305,14 @@ public class BurningCreativeSuite extends JavaPlugin {
                         return true;
                     }
                     if (arg.equalsIgnoreCase("disable")) {
-                        this.config.yml.setProperty("Creative Players.Placed Blocks Give No Drops.Players", true);
-                        this.config.yml.setProperty("Creative Players.Placed Blocks Give No Drops.Explosions", true);
+                        this.config.yml.set("Creative Players.Placed Blocks Give No Drops.Players", true);
+                        this.config.yml.set("Creative Players.Placed Blocks Give No Drops.Explosions", true);
                         this.config.reload();
                         cs.sendMessage("[BurningCS] Creative blocks item dropping is now " + ChatColor.RED + "DISABLED");
                         return true;
                     } else if (arg.equalsIgnoreCase("enable")) {
-                        this.config.yml.setProperty("Creative Players.Placed Blocks Give No Drops.Players", false);
-                        this.config.yml.setProperty("Creative Players.Placed Blocks Give No Drops.Explosions", false);
+                        this.config.yml.set("Creative Players.Placed Blocks Give No Drops.Players", false);
+                        this.config.yml.set("Creative Players.Placed Blocks Give No Drops.Explosions", false);
                         this.config.reload();
                         cs.sendMessage("[BurningCS] Creative blocks item dropping is now" + ChatColor.GREEN + " ENABLED");
                         return true;
@@ -291,12 +336,12 @@ public class BurningCreativeSuite extends JavaPlugin {
                         return true;
                     }
                     if (arg.equalsIgnoreCase("disable")) {
-                        this.config.yml.setProperty("Creative Players.Disable Bottom-of-the-World Bedrock Break", true);
+                        this.config.yml.set("Creative Players.Disable Bottom-of-the-World Bedrock Break", true);
                         this.config.reload();
                         cs.sendMessage("[BurningCS] Bottom-of-the-World bedrock breaking is now " + ChatColor.RED + "DISABLED");
                         return true;
                     } else if (arg.equalsIgnoreCase("enable")) {
-                        this.config.yml.setProperty("Creative Players.Disable Bottom-of-the-World Bedrock Break", false);
+                        this.config.yml.set("Creative Players.Disable Bottom-of-the-World Bedrock Break", false);
                         this.config.reload();
                         cs.sendMessage("[BurningCS] Bottom-of-the-World bedrock breaking is now" + ChatColor.GREEN + " ENABLED");
                         return true;
@@ -320,12 +365,12 @@ public class BurningCreativeSuite extends JavaPlugin {
                         return true;
                     }
                     if (arg.equalsIgnoreCase("enable")) {
-                        this.config.yml.setProperty("Game Mode.Separate Inventories", true);
+                        this.config.yml.set("Game Mode.Separate Inventories", true);
                         this.config.reload();
                         cs.sendMessage("[BurningCS] Separate inventories are now" + ChatColor.GREEN + " ENABLED");
                         return true;
                     } else if (arg.equalsIgnoreCase("disable")) {
-                        this.config.yml.setProperty("Game Mode.Separate Inventories", false);
+                        this.config.yml.set("Game Mode.Separate Inventories", false);
                         this.config.reload();
                         cs.sendMessage("[BurningCS] Separate inventories are now " + ChatColor.RED + "DISABLED");
                         return true;
@@ -347,7 +392,7 @@ public class BurningCreativeSuite extends JavaPlugin {
                     return true;
                 }
                 cs.sendMessage("[BurningCS] Reloading Config");
-                this.config.yml.load();
+                this.config.reload();
                 cs.sendMessage("[BurningCS] Config Reloaded");
                 return true;
             }
@@ -374,13 +419,13 @@ public class BurningCreativeSuite extends JavaPlugin {
                         return true;
                     }
                     if (arg.equalsIgnoreCase("enable")) {
-                        this.config.yml.setProperty("Update.Notifications", true);
+                        this.config.yml.set("Update.Notifications", true);
                         this.config.reload();
                         tellUpdate = this.config.yml.getBoolean("Update.Notifications", true);
                         cs.sendMessage("[BurningCS] Update notifications are now" + ChatColor.GREEN + " ENABLED");
                         return true;
                     } else if (arg.equalsIgnoreCase("disable")) {
-                        this.config.yml.setProperty("Update.Notifications", false);
+                        this.config.yml.set("Update.Notifications", false);
                         this.config.reload();
                         tellUpdate = this.config.yml.getBoolean("Update.Notifications", true);
                         cs.sendMessage("[BurningCS] Update notifications are now " + ChatColor.RED + "DISABLED");
@@ -392,10 +437,10 @@ public class BurningCreativeSuite extends JavaPlugin {
                         return true;
                     }
                     if ((cs instanceof Player)) {
-                        checkForUpdates(this, player, true);
+                        this.getServer().getScheduler().scheduleAsyncDelayedTask(this, new BCSUpdater(this, player, true));
                         return true;
                     } else {
-                        checkForUpdates(this, cs);
+                        this.getServer().getScheduler().scheduleAsyncDelayedTask(this, new BCSUpdater(this, cs));
                         return true;
                     }
                 }
@@ -457,77 +502,5 @@ public class BurningCreativeSuite extends JavaPlugin {
             }
         }
         return false;
-    }
-
-    public static void checkForUpdates(BurningCreativeSuite plugin, Player player, boolean response) {
-        scriptVersion = Double.valueOf(Double.parseDouble(plugin.getDescription().getVersion())).doubleValue();
-        try {
-            double currver = getCurrentVersion(player, currentVerUrl);
-            if (currver > scriptVersion) {
-                player.sendMessage("[BurningCS] There has been an update!");
-                player.sendMessage("[BurningCS] Your current version is " + scriptVersion + ".");
-                player.sendMessage("[BurningCS] The newest version is " + currver);
-                player.sendMessage("[BurningCS] ChangeLog: " + changes);
-                player.sendMessage("[BurningCS] Please visit the BukkitDev page to update!");
-            } else {
-                if (response) {
-                    player.sendMessage("[BurningCS] is up to date!");
-                }
-                return;
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    public static double getCurrentVersion(Player player, String site) {
-        try {
-            BufferedReader r = new BufferedReader(new InputStreamReader(new URL(site).openStream()));
-            String[] string = r.readLine().split(";");
-            changes = string[1];
-            double d = Double.parseDouble(string[0]);
-            r.close();
-            return d;
-        } catch (Exception e) {
-            player.sendMessage("[BurningCS] Error checking for latest version.");
-            e.printStackTrace();
-        }
-        return scriptVersion;
-    }
-
-    public static void checkForUpdates(BurningCreativeSuite plugin, CommandSender player) {
-        scriptVersion = Double.valueOf(Double.parseDouble(plugin.getDescription().getVersion())).doubleValue();
-        try {
-            double currver = getCurrentVersion(player, currentVerUrl);
-            if (currver > scriptVersion) {
-                player.sendMessage("[BurningCS] There has been an update!");
-                player.sendMessage("[BurningCS] Your current version is " + scriptVersion + ".");
-                player.sendMessage("[BurningCS] The newest version is " + currver);
-                player.sendMessage("[BurningCS] ChangeLog: " + changes);
-                player.sendMessage("[BurningCS] Please visit the BukkitDev page to update!");
-            } else {
-                player.sendMessage("[BurningCS] is up to date!");
-                return;
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    public static double getCurrentVersion(CommandSender player, String site) {
-        try {
-            BufferedReader r = new BufferedReader(new InputStreamReader(new URL(site).openStream()));
-            String[] string = r.readLine().split(";");
-            changes = string[1];
-            double d = Double.parseDouble(string[0]);
-            r.close();
-            return d;
-        } catch (SocketTimeoutException e) {
-            player.sendMessage("[BurningCS] Could not connect to update server.");
-        } catch (Exception e) {
-            player.sendMessage("[BurningCS] Error checking for latest version.");
-            e.printStackTrace();
-        }
-        return scriptVersion;
     }
 }

@@ -1,7 +1,8 @@
 package me.ahniolator.plugins.burningcreativesuite;
 
 import java.io.File;
-import org.bukkit.util.config.Configuration;
+import java.io.IOException;
+import org.bukkit.configuration.file.YamlConfiguration;
 
 public final class BCSConfig {
 
@@ -12,7 +13,7 @@ public final class BCSConfig {
     private final BCSEntityListener entityListener;
     private String dir;
     private File configFile;
-    public Configuration yml;
+    public YamlConfiguration yml = new YamlConfiguration();
 
     public BCSConfig(BurningCreativeSuite plugin, BCSPlayerListener playerListener, BCSBlockListener blockListener, BCSConfig config, String dir, BCSEntityListener entityListener) {
         this.plugin = plugin;
@@ -32,8 +33,8 @@ public final class BCSConfig {
                 System.out.println("[BurningCS] Could not find the config file! Making a new one.");
                 new File(this.dir).mkdir();
                 this.configFile.createNewFile();
-                this.yml = new Configuration(this.configFile);
                 setDefaults();
+                this.yml.load(configFile);
                 System.out.println("[BurningCS] Config file loaded successfully!");
             } catch (Exception e) {
                 System.out.println("[BurningCS] Could not read config file!");
@@ -41,8 +42,8 @@ public final class BCSConfig {
             }
         } else {
             try {
-                this.yml = new Configuration(this.configFile);
-                this.yml.load();
+                this.configFile.createNewFile();
+                this.yml.load(configFile);
                 System.out.println("[BurningCS] Config file loaded successfully!");
             } catch (Exception e) {
                 System.out.println("[BurningCS] Could not read config file!");
@@ -57,29 +58,33 @@ public final class BCSConfig {
             new File(this.dir).mkdir();
             this.configFile.delete();
             this.configFile.createNewFile();
-            this.yml = new Configuration(this.configFile);
         } catch (Exception e) {
             System.out.println("[BurningCS] Could not read config file!");
             e.printStackTrace();
         }
-        this.yml.setProperty("Enderman.Disable Pickup", true);
-        this.yml.setProperty("Creative Players.Disable Item Dropping", true);
-        this.yml.setProperty("Creative Players.Placed Blocks Give No Drops.Players", true);
-        this.yml.setProperty("Creative Players.Placed Blocks Give No Drops.Explosions", true);
-        this.yml.setProperty("Creative Players.Disable Bottom-of-the-World Bedrock Break", true);
-        this.yml.setProperty("Creative Players.Attack other entities", false);
-        this.yml.setProperty("Game Mode.Separate Inventories", true);
-        this.yml.setProperty("Update.Notifications", true);
-        this.yml.setProperty("Blocks Save Interval", 15);
-        this.yml.save();
+        this.yml.set("Enderman.Disable Pickup", true);
+        this.yml.set("Creative Players.Disable Item Dropping", true);
+        this.yml.set("Creative Players.Disable Item Pickup", true);
+        this.yml.set("Creative Players.Placed Blocks Give No Drops.Players", true);
+        this.yml.set("Creative Players.Placed Blocks Give No Drops.Explosions", true);
+        this.yml.set("Creative Players.Disable Bottom-of-the-World Bedrock Break", true);
+        this.yml.set("Creative Players.Attack other entities", false);
+        this.yml.set("Game Mode.Separate Inventories", true);
+        this.yml.set("Update.Notifications", true);
+        this.yml.set("Blocks Save Interval", 15);
+        try {
+            this.yml.save(configFile);
+        } catch (IOException ex) {
+            System.out.println("[BurningCS] Could not save config file!");
+            ex.printStackTrace();
+        }
         System.out.println("[BurningCS] Default values set!");
-        this.yml.load();
     }
 
     public void reload() {
         try {
-            this.yml.save();
-            this.yml.load();
+            this.yml.save(configFile);
+            this.yml.load(configFile);
         } catch (Exception e) {
             System.out.println("[BurningCS] Could not read config file!");
             e.printStackTrace();
@@ -88,7 +93,7 @@ public final class BCSConfig {
 
     public void save() {
         try {
-            this.yml.save();
+            this.yml.save(configFile);
         } catch (Exception e) {
             System.out.println("[BurningCS] Could not save config file!");
             e.printStackTrace();

@@ -8,13 +8,18 @@ import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.PoweredMinecart;
+import org.bukkit.entity.StorageMinecart;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerListener;
+import org.bukkit.event.player.PlayerPickupItemEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
@@ -55,7 +60,7 @@ public class BCSPlayerListener extends PlayerListener {
         if ((!player.isOp() && !player.hasPermission("bcs.admin")) || !tellUpdate) {
             return;
         }
-        BurningCreativeSuite.checkForUpdates(this.plugin, player, false);
+        this.plugin.getServer().getScheduler().scheduleAsyncDelayedTask(plugin, new BCSUpdater(this.plugin, player, false));
         return;
     }
 
@@ -184,7 +189,7 @@ public class BCSPlayerListener extends PlayerListener {
             return;
         }
         Player player = event.getPlayer();
-        if (player.hasPermission("bcm.bypass.creativedrop")) {
+        if (player.hasPermission("bcs.bypass.creativedrop")) {
             return;
         }
         if (player.getGameMode().equals(GameMode.CREATIVE)) {
@@ -220,12 +225,46 @@ public class BCSPlayerListener extends PlayerListener {
         if (!this.config.yml.getBoolean("Game Mode.Separate Inventories", true)) {
             return;
         }
-        if (player.hasPermission("bcm.bypass.creativedrop")) {
+        Block block = event.getClickedBlock();
+        if ((block.getType() == Material.CHEST || block.getType() == Material.FURNACE || block.getType() == Material.DISPENSER || block.getType() == Material.WORKBENCH) && 
+                !player.hasPermission("bcs.bypass.chestaccess")) {
+            event.setCancelled(true);
             return;
         }
-        Block block = event.getClickedBlock();
-        if (block.getType() == Material.CHEST || block.getType() == Material.FURNACE || block.getType() == Material.DISPENSER || block.getType() == Material.WORKBENCH) {
-            event.setCancelled(true);
+        return;
+    }
+
+    @Override
+    public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
+        if (event.isCancelled()) {
+            return;
+        }
+        Player player = event.getPlayer();
+        if (player.getGameMode().equals(GameMode.CREATIVE)) {
+            if (!this.config.yml.getBoolean("Game Mode.Separate Inventories", true)) {
+                return;
+            }
+            if (player.hasPermission("bcs.bypass.chestaccess")) {
+                return;
+            }
+            Entity entity = event.getRightClicked();
+            if (entity instanceof StorageMinecart || entity instanceof PoweredMinecart) {
+                event.setCancelled(true);
+            }
+        }
+    }
+
+    @Override
+    public void onPlayerPickupItem(PlayerPickupItemEvent event) {
+        if (event.isCancelled()) {
+            return;
+        }
+        if (this.config.yml.getBoolean("Creative Players.Disable Item Pickup", true)) {
+            Player player = event.getPlayer();
+            if (!player.hasPermission("bcs.bypass.creativepickup") && player.getGameMode().equals(GameMode.CREATIVE)) {
+                event.setCancelled(true);
+                return;
+            }
             return;
         }
         return;

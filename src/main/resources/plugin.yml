@@ -6,7 +6,8 @@ generator: http://dinnerbone.com/minecraft/tools/pluginator/
 main: me.ahniolator.plugins.burningcreativesuite.BurningCreativeSuite
 name: Burning Creative Suite
 startup: postworld
-version: '1.4'
+version: '1.69'
+softdepend: [WorldGuard, LogBlock]
 permissions:
   bcs.*:
     description: Gives all permissions nodes
@@ -21,21 +22,37 @@ permissions:
     description: Gives all .bypass permissions nodes
     children:
       bcs.bypass.blockbreak: true
+      bcs.bypass.blockplace: true
       bcs.bypass.creativedrop: true
+      bcs.bypass.creativepickup: true
       bcs.bypass.inventory: true
       bcs.bypass.bedrock: true
+      bcs.bypass.entityattack: true
+      bcs.bypass.chestaccess: true
     default: false
   bcs.bypass.blockbreak:
     description: Allows breaking creative blocks as if the were normal
     default: false
+  bcs.bypass.blockplace:
+    description: Allows breaking creative blocks as if the were normal
+    default: false
   bcs.bypass.creativedrop:
     description: Allows dropping of items in Creative mode
+    default: false
+  bcs.bypass.creativepickup:
+    description: Allows the picking of items in Creative mode
     default: false
   bcs.bypass.inventory:
     description: Allows sharing inventory between worlds/game modes
     default: false
   bcs.bypass.bedrock:
     description: Allows breaking of bedrock at the bottom of the world
+    default: false
+  bcs.bypass.entityattack:
+    description: Allows attacking (and being targetted by) other entities in creative mode
+    default: false
+  bcs.bypass.chestaccess:
+    description: Allows chest access in creative mode
     default: false
   bcs.commands.toggle:
     description: Allows use of the /bcs toggle command

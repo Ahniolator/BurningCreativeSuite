@@ -1,1 +1,1 @@
-1.4;Big update! See the thread/bukkitDev page for more info!
+1.69;Fixed bcs.bypass.entityattack. You can now damage entities properly with this permission

@@ -36,7 +36,7 @@ public class BCSBlockListener extends BlockListener {
     public String dataDir, worldDir;
     public String blockFileX, blockFileY, blockFileZ;
     public File fileX, fileY, fileZ;
-    public boolean isOnStart = true, devMode = false, isDoor = false;
+    public boolean isOnStart = true, devMode = false, isDoor = false, hasSaved = false;
     private long starttime, stoptime;
 
     public BCSBlockListener(BurningCreativeSuite plugin, BCSPlayerListener playerListener, BCSBlockListener blockListener, BCSConfig config, BCSEntityListener entityListener, String dataDir, BCSInventoryManager invManager) {
@@ -69,7 +69,7 @@ public class BCSBlockListener extends BlockListener {
         this.breakingMats.add(Material.WOODEN_DOOR);
         this.breakingMats.add(Material.IRON_DOOR_BLOCK);
     }
-
+    
     @Override
     public void onBlockBreak(BlockBreakEvent event) {
         if (this.devMode) {
@@ -78,11 +78,16 @@ public class BCSBlockListener extends BlockListener {
         if (event.isCancelled()) {
             return;
         }
+        Player player = event.getPlayer();
+        Block block = event.getBlock();
+        if (plugin.worldGuard != null && !plugin.worldGuard.canBuild(player, block)) {
+            return;
+        }
+        int oldBlockType = block.getTypeId();
+        byte oldBlockData = block.getData();
         try {
-            Player player = event.getPlayer();
-            Block block = event.getBlock();
             y = block.getLocation().getBlockY();
-            if (block.getType() == Material.BEDROCK && block.getLocation().getBlockY() <= 5 && !player.hasPermission("bcm.breakbedrock")) {
+            if (block.getType() == Material.BEDROCK && block.getLocation().getBlockY() <= 5 && !player.hasPermission("bcs.breakbedrock")) {
                 if (!this.config.yml.getBoolean("Creative Players.Disable Bottom-of-the-World Bedrock Break", true)) {
                     return;
                 }
@@ -123,7 +128,7 @@ public class BCSBlockListener extends BlockListener {
                             this.invManager.createNewFile(this.fileZ, this.worldDir);
                         }
                         save(blockZ, this.blockFileZ);
-                        System.out.println("[BurningCS] Saved block data!");
+                        this.hasSaved = true;
                     } catch (Exception ex) {
                         System.out.println("[BurningCS] Failed to save block data!");
                         ex.printStackTrace();
@@ -144,7 +149,6 @@ public class BCSBlockListener extends BlockListener {
                     blockY = (ArrayList<Integer>) load(this.blockFileY);
                     blockZ = (ArrayList<Integer>) load(this.blockFileZ);
                     this.loadedWorld = worldName;
-                    System.out.println("[BurningCS] Loaded block data!");
                 } catch (EOFException e) {
                 } catch (Exception e) {
                 }
@@ -153,7 +157,17 @@ public class BCSBlockListener extends BlockListener {
                 if (this.devMode) {
                     player.sendMessage("You broke a block placed in creative mode!");
                 }
-                if (!player.hasPermission("bcm.bypass.blockbreak") && this.config.yml.getBoolean("Creative Players.Placed Blocks Give No Drops.Players", true)) {
+                if (!player.hasPermission("bcs.bypass.blockbreak") && this.config.yml.getBoolean("Creative Players.Placed Blocks Give No Drops.Players", true)) {
+                    if (hasSaved) {
+                        worldDir = dataDir + worldName + File.separator;
+                        blockFileX = worldDir + "blocksX.data";
+                        blockFileY = worldDir + "blocksY.data";
+                        blockFileZ = worldDir + "blocksZ.data";
+                        fileX = new File(blockFileX);
+                        fileY = new File(blockFileY);
+                        fileZ = new File(blockFileZ);
+                        loadBlockData(this.blockFileX, this.blockFileY, this.blockFileZ, worldName);
+                    }
                     event.setCancelled(true);
                     Block block2 = block.getRelative(BlockFace.UP);
                     if (this.breakingMats.contains(block2.getType())
@@ -163,6 +177,12 @@ public class BCSBlockListener extends BlockListener {
                         if (block2.getType().equals(Material.TORCH) || block2.getType().equals(Material.REDSTONE_TORCH_OFF) || block2.getType().equals(Material.REDSTONE_TORCH_ON)) {
                             if (block2.getData() == 5) {
                                 block2.setType(Material.AIR);
+                                xi = blockX.lastIndexOf(block2.getLocation().getBlockX());
+                                blockX.remove(xi);
+                                yi = blockY.lastIndexOf(block2.getLocation().getBlockY());
+                                blockY.remove(yi);
+                                zi = blockZ.lastIndexOf(block2.getLocation().getBlockZ());
+                                blockZ.remove(zi);
                             }
                         } else if ((block2.getType().equals(Material.WOODEN_DOOR) && block2.getRelative(BlockFace.UP).getType().equals(Material.WOODEN_DOOR))
                                 || (block2.getType().equals(Material.IRON_DOOR_BLOCK) && block2.getRelative(BlockFace.UP).getType().equals(Material.IRON_DOOR_BLOCK))) {
@@ -174,7 +194,7 @@ public class BCSBlockListener extends BlockListener {
                             zi = blockZ.lastIndexOf(block2.getLocation().getBlockZ());
                             blockZ.remove(zi);
                             block2.getRelative(BlockFace.UP).setType(Material.AIR);
-                        } else {
+                        } else if (block2.getType() != Material.WOODEN_DOOR && block2.getType() != Material.IRON_DOOR_BLOCK) {
                             block2.setType(Material.AIR);
                             xi = blockX.lastIndexOf(block2.getLocation().getBlockX());
                             blockX.remove(xi);
@@ -182,19 +202,28 @@ public class BCSBlockListener extends BlockListener {
                             blockY.remove(yi);
                             zi = blockZ.lastIndexOf(block2.getLocation().getBlockZ());
                             blockZ.remove(zi);
+                        } else {
+                            block2.setType(Material.AIR);
                         }
                     }
-                    block.setType(Material.AIR);
-                    xi = blockX.lastIndexOf(x);
-                    blockX.remove(xi);
-                    yi = blockY.lastIndexOf(y);
-                    blockY.remove(yi);
-                    zi = blockZ.lastIndexOf(z);
-                    blockZ.remove(zi);
                     if (this.isDoor) {
-                        player.sendMessage("Block was a door!");
+                        block.setType(Material.AIR);
+                        xi = blockX.lastIndexOf(x);
+                        blockX.remove(xi);
+                        yi = blockY.lastIndexOf(y);
+                        blockY.remove(yi);
+                        zi = blockZ.lastIndexOf(z);
+                        blockZ.remove(zi);
                         block.getRelative(BlockFace.UP).setType(Material.AIR);
                         this.isDoor = false;
+                    } else {
+                        block.setType(Material.AIR);
+                        xi = blockX.lastIndexOf(x);
+                        blockX.remove(xi);
+                        yi = blockY.lastIndexOf(y);
+                        blockY.remove(yi);
+                        zi = blockZ.lastIndexOf(z);
+                        blockZ.remove(zi);
                     }
                     this.blocksNum++;
                     if (this.blocksNum >= this.config.yml.getInt("Blocks Save Interval", 15)) {
@@ -211,7 +240,7 @@ public class BCSBlockListener extends BlockListener {
                                 this.invManager.createNewFile(this.fileZ, this.worldDir);
                             }
                             save(blockZ, this.blockFileZ);
-                            System.out.println("[BurningCS] Saved block data!");
+                            this.hasSaved = true;
                             this.blocksNum = 0;
                         } catch (Exception ex) {
                             System.out.println("[BurningCS] Failed to save block data!");
@@ -222,6 +251,10 @@ public class BCSBlockListener extends BlockListener {
             }
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            if (event.isCancelled() && plugin.logBlock != null) {
+                plugin.logBlock.getConsumer().queueBlockBreak(player.getName(), block.getLocation(), oldBlockType, oldBlockData);
+            }
         }
         if (this.devMode) {
             this.stoptime = System.currentTimeMillis();
@@ -245,11 +278,28 @@ public class BCSBlockListener extends BlockListener {
             return;
         }
         Player player = event.getPlayer();
+        if (player.hasPermission("bcs.bypass.blockplace")) {
+            return;
+        }
+        if (hasSaved) {
+            worldDir = dataDir + worldName + File.separator;
+            blockFileX = worldDir + "blocksX.data";
+            blockFileY = worldDir + "blocksY.data";
+            blockFileZ = worldDir + "blocksZ.data";
+            fileX = new File(blockFileX);
+            fileY = new File(blockFileY);
+            fileZ = new File(blockFileZ);
+            loadBlockData(this.blockFileX, this.blockFileY, this.blockFileZ, worldName);
+        }
         if (player.getGameMode().equals(GameMode.CREATIVE)) {
             Block block = event.getBlock();
-            if (block.getType().equals(Material.BED_BLOCK) || block.getType().equals(Material.TNT)) {
-                player.sendMessage("[BurningCS] You cannot place that in CREATIVE mode!");
-                event.setCancelled(true);
+            if (block.getType().equals(Material.SAND)
+                    || block.getType().equals(Material.GRAVEL)
+                    || block.getType().equals(Material.MINECART)
+                    || block.getType().equals(Material.STORAGE_MINECART)
+                    || block.getType().equals(Material.POWERED_MINECART)
+                    || block.getType().equals(Material.BED_BLOCK)
+                    || block.getType().equals(Material.TNT)) {
                 return;
             }
             try {
@@ -275,7 +325,7 @@ public class BCSBlockListener extends BlockListener {
                                 this.invManager.createNewFile(this.fileZ, this.worldDir);
                             }
                             save(blockZ, this.blockFileZ);
-                            System.out.println("[BurningCS] Saved block data!");
+                            this.hasSaved = true;
                         } catch (Exception ex) {
                             System.out.println("[BurningCS] Failed to save block data!");
                             ex.printStackTrace();
@@ -308,7 +358,6 @@ public class BCSBlockListener extends BlockListener {
                         blockY = (ArrayList<Integer>) load(this.blockFileY);
                         blockZ = (ArrayList<Integer>) load(this.blockFileZ);
                         this.loadedWorld = worldName;
-                        System.out.println("[BurningCS] Loaded block data!");
                     } catch (EOFException e) {
                     } catch (Exception e) {
                     }
@@ -331,7 +380,7 @@ public class BCSBlockListener extends BlockListener {
                             this.invManager.createNewFile(this.fileZ, this.worldDir);
                         }
                         save(blockZ, this.blockFileZ);
-                        System.out.println("[BurningCS] Saved block data!");
+                        this.hasSaved = true;
                         this.blocksNum = 0;
                     } catch (Exception ex) {
                         System.out.println("[BurningCS] Failed to save block data!");
@@ -387,11 +436,22 @@ public class BCSBlockListener extends BlockListener {
                     this.invManager.createNewFile(this.fileZ, this.worldDir);
                 }
                 save(blockZ, this.blockFileZ);
-                System.out.println("[BurningCS] Saved block data!");
             }
         } catch (Exception ex) {
             System.out.println("[BurningCS] Failed to save block data!");
             ex.printStackTrace();
+        }
+    }
+
+    private void loadBlockData(String x, String y, String z, String wn) {
+        try {
+            blockX = (ArrayList<Integer>) load(this.blockFileX);
+            blockY = (ArrayList<Integer>) load(this.blockFileY);
+            blockZ = (ArrayList<Integer>) load(this.blockFileZ);
+            this.loadedWorld = wn;
+            hasSaved = false;
+        } catch (EOFException e) {
+        } catch (Exception e) {
         }
     }
 }

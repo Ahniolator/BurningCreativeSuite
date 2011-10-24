@@ -177,7 +177,7 @@ public class BCSEntityListener extends EntityListener {
                 return;
             }
             Player player = (Player) a.getShooter();
-            if (player.getGameMode().equals(GameMode.CREATIVE)) {
+            if (player.getGameMode().equals(GameMode.CREATIVE) && !player.hasPermission("bcs.bypass.entityattack")) {
                 player.sendMessage("[BurningCS] You are not allowed to attack other entities in");
                 player.sendMessage("[BurningCS] Creative Mode!");
                 event.setCancelled(true);
@@ -186,12 +186,12 @@ public class BCSEntityListener extends EntityListener {
             return;
         } else if (nEvent.getDamager() instanceof Player) {
             Player player = (Player) nEvent.getDamager();
-            if (!player.getGameMode().equals(GameMode.CREATIVE)) {
+            if (player.getGameMode().equals(GameMode.CREATIVE) && !player.hasPermission("bcs.bypass.entityattack")) {
+                player.sendMessage("[BurningCS] You are not allowed to attack other entities in");
+                player.sendMessage("[BurningCS] Creative Mode!");
+                event.setCancelled(true);
                 return;
             }
-            player.sendMessage("[BurningCS] You are not allowed to attack other entities in");
-            player.sendMessage("[BurningCS] Creative Mode!");
-            event.setCancelled(true);
             return;
         } else {
             return;
@@ -207,7 +207,7 @@ public class BCSEntityListener extends EntityListener {
             return;
         }
         Player player = (Player) event.getTarget();
-        if (player.getGameMode().equals(GameMode.CREATIVE) && !this.config.yml.getBoolean("Creative Players.Attack other entities", true)) {
+        if (player.getGameMode().equals(GameMode.CREATIVE) && !this.config.yml.getBoolean("Creative Players.Attack other entities", true) && !player.hasPermission("bcs.bypass.entityattack")) {
             event.setCancelled(true);
         }
         return;
